@@ -5,7 +5,6 @@ class PodfileLockParser {
     private let pods: [Pod]
     private let checkouts: [Checkout]
     private let checksums: [String: String]
-    private let specRepos: [String: [String]]
     init(file: String) throws {
         let sections = file
             .replacingOccurrences(of: "\"", with: "")   // Clean " characters
@@ -16,12 +15,10 @@ class PodfileLockParser {
         }
         
         self.pods = try parse(pods: sections[0])
-        self.checkouts = try parse(externalSources: sections[3], checkoutOptions: sections[4])
+        self.checkouts = try parse(specRepo: sections[2], externalSources: sections[3], checkoutOptions: sections[4])
         self.checksums = try parse(checksums: sections[5])
-        self.specRepos = try parse(specRepo: sections[2])
     }
 }
-
 // MARK: Patterns
 private enum Pattern {
     // ([+\w\/-]+)
@@ -82,7 +79,7 @@ private func parse(pods: String) throws -> [Pod] {
 }
 
 // MARK: Spec Repos
-private func parse(specRepo: String) throws -> [String: [String]] {
+private func parse(specRepo: String) throws -> [Checkout] {
     try specRepo
         .match(pattern: Pattern.specRepos) { repo -> (url: String, pods: [String]) in
             let url = try specRepo.value(from: repo, at: 1)
@@ -92,24 +89,26 @@ private func parse(specRepo: String) throws -> [String: [String]] {
             }
             return (url: url, pods: pods)
         }
-        .reduce(into: [String: [String]]()) { result, repo in
-            result[repo.url] = repo.pods
+        .map { url, pods in
+            pods.map { Checkout(name: $0, source: .specRepo(url)) }
         }
+        .flatMap { $0 }
 }
 // MARK: Checkouts
-private struct Checkout {
-    let name: String
-    
-    enum Source {
-        case path(String)
-        case gitTag(String)
-        case gitCommit(String)
-    }
-    let source: Source
+enum CheckoutSource {
+    case path(String)
+    case gitTag(String)
+    case gitCommit(String)
+    case specRepo(String)
 }
 
-private func parse(externalSources: String, checkoutOptions: String) throws -> [Checkout] {
-    try externalSources.match(pattern: Pattern.externalSource) { source in
+private struct Checkout {
+    let name: String
+    let source: CheckoutSource
+}
+
+private func parse(specRepo: String, externalSources: String, checkoutOptions: String) throws -> [Checkout] {
+    let checkouts: [Checkout] = try externalSources.match(pattern: Pattern.externalSource) { source in
         let name = try externalSources.value(from: source, at: 1)
         let sourceType = try externalSources.value(from: source, at: 2)
         
@@ -121,7 +120,7 @@ private func parse(externalSources: String, checkoutOptions: String) throws -> [
             return try checkoutOptions.firstMatch(pattern: Pattern.checkoutOption(for: name)) { option in
                 let type = try checkoutOptions.value(from: option, at: 2)
                 let value = try checkoutOptions.value(from: option, at: 3)
-                let source: Checkout.Source
+                let source: CheckoutSource
                 switch type {
                 case "commit":
                     source = .gitCommit(value)
@@ -136,6 +135,21 @@ private func parse(externalSources: String, checkoutOptions: String) throws -> [
             throw "unrecognized external source <\(sourceType)>"
         }
     }
+    let specRepos = try specRepo
+        .match(pattern: Pattern.specRepos) { repo -> (url: String, pods: [String]) in
+            let url = try specRepo.value(from: repo, at: 1)
+            let repo = try specRepo.value(from: repo, at: 0)
+            let pods = try repo.match(pattern: Pattern.podInSpec) { spec in
+                try repo.value(from: spec, at: 1)
+            }
+            return (url: url, pods: pods)
+        }
+        .map { url, pods in
+            pods.map { Checkout(name: $0, source: .specRepo(url)) }
+        }
+        .flatMap { $0 }
+    
+    return checkouts + specRepos
 }
 
 // MARK: Checksums
