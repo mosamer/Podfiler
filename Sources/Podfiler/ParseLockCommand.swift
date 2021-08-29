@@ -30,51 +30,6 @@ struct ParseLockCommand: ParsableCommand {
             .flatMap { url, repos in
                 repos.map { (podName: $0, repo: url) }
             }
-        
-        let checkouts = try parse(externalSources: sections[3],
-                                  checkoutOptions: sections[4])
-        
-        let sourced = checkouts.map { $0.name } + specRepos.map { $0.podName }
-        
-        let checksums = try parseSpecChecksums(sections[5])
-        
-    
-        Console.debug("SPECS: \(checksums.count)")
-        
-        let podfileChecksum = try parseFileCheckSum(sections[6])
-        Console.debug("CHECKSUM: \(podfileChecksum)")
-        
-        let cocoapodVersion = try parseCocoapodsVersion(sections[7])
-        Console.debug("Version: \(cocoapodVersion)")
-    }
-    
-    private func parse(externalSources: String, checkoutOptions: String) throws -> [Pod] {
-        try externalSources.match(pattern: "\\s{2}([\\w-]+):\\n\\s{4}:(path|git): \"?([\\w.:@\\/-]+)\"?") { match -> Pod in
-            let name = try externalSources.value(at: match.range(at: 1))
-            let source = try externalSources.value(at: match.range(at: 2))
-            switch source {
-            case "path":
-                let path = try externalSources.value(at: match.range(at: 3))
-                return Pod(name: name, source: .path(path))
-            case "git":
-                return try checkoutOptions.firstMatch(pattern: "\\s{2}\(name):\\n(.*\\n)?\\s{4}:(commit|tag): ([\\w.-]+)") { co -> Pod in
-                    let option = try checkoutOptions.value(at: co.range(at: 2))
-                    let value = try checkoutOptions.value(at: co.range(at: 3))
-                    let source: Pod.Source
-                    switch option {
-                    case "commit":
-                        source = .gitCommit(value)
-                    case "tag":
-                        source = .gitTag(value)
-                    default:
-                        throw "unrecognized checkout option <\(option)>"
-                    }
-                    return Pod(name: name, source: source)
-                }
-            default:
-                throw "unrecognized external source <\(source)>"
-            }
-        }
     }
     
     private func parseSpecRepos(_ section: String) throws -> [String: [String]] {
@@ -184,7 +139,7 @@ extension String {
     }
 }
 
-struct Pod {
+struct Pod_ {
     let name: String
     
     enum Source {

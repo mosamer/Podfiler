@@ -3,6 +3,9 @@ import TSCUtility
 
 class PodfileLockParser {
     private let pods: [Pod]
+    private let checkouts: [Checkout]
+    private let checksums: [String: String]
+    
     init(file: String) throws {
         let sections = file
             .replacingOccurrences(of: "\"", with: "")   // Clean " characters
@@ -12,55 +15,116 @@ class PodfileLockParser {
             throw "something went wrong. `Podfile.lock` does not lock as expected"
         }
         
-        self.pods = try PodfileLockParser.parse(pods: sections[0])
-        
-        print(pods.count)
+        self.pods = try parse(pods: sections[0])
+        self.checkouts = try parse(externalSources: sections[3], checkoutOptions: sections[4])
+        self.checksums = try parse(checksums: sections[5])
     }
 }
 
 // MARK: Patterns
 private enum Pattern {
     // ([+\w\/-]+)
-    static let podName = "([+\\w\\/-]+)"
+    private static let podName = "([+\\w\\/-]+)"
     // (\d+(.\d+(.\d+(-[\w\d.]+)?)?)?)
-    static let semVer = "(\\d+(.\\d+(.\\d+(-[\\w\\d.]+)?)?)?)"
+    private static let semVer = "(\\d+(.\\d+(.\\d+(-[\\w\\d.]+)?)?)?)"
     // \s{2}- ([+\w\/-]+) \((\d+(.\d+(.\d+(-[\w\d.]+)?)?)?)\)(:(\n\s{4}- ([+\w\/-]+)( \(([=\s\d.>,~<]+)\))?)+)?
     static let podTree = "\\s{2}- \(podName) \\(\(semVer)\\)(:(\(podDependency))+)?"
     // [=\s\d.>,~<]+
     private static let constraint = "[=\\s\\d.>,~<]+"
     // \n\s{4}- ([+\w\/-]+)( \(([=\s\d.>,~<]+)\))?
     static let podDependency = "\\n\\s{4}- \(podName)( \\((\(constraint))\\))?"
-}
-
-// MARK: Pods Section
-private extension PodfileLockParser {
-    struct Pod {
-        let name: String
-        let version: Version
-        let dependencies: [TransitiveDependency]
-    }
-    struct TransitiveDependency {
-        let name: String
-        let constraint: String?
+    
+    // \s{2}([+\w\/-]+):\n\s{4}:(path|git): ([-.\w:\/@]+)
+    static let externalSource = "\\s{2}\(podName):\\n\\s{4}:(path|git): ([-.\\w:\\/@]+)"
+    
+    // \s{2}<name>:\n(.*\n)?\s{4}:(commit|tag): ([\w.-]+)
+    static func checkoutOption(for name: String) -> String {
+        "\\s{2}\(name):\\n(.*\\n)?\\s{4}:(commit|tag): ([\\w.-]+)"
     }
     
-    static func parse(pods: String) throws -> [Pod] {
-        try pods.match(pattern: Pattern.podTree) { pod in
-            let name = try pods.value(at: pod.range(at: 1))
-            let version = try pods.value(at: pod.range(at: 2))
-            let transitives: [TransitiveDependency]
-            if let subTree = try? pods.value(at: pod.range(at: 6)) {
-                transitives = try subTree
-                    .match(pattern: Pattern.podDependency) { dependency in
-                        TransitiveDependency(
-                            name: try subTree.value(at: dependency.range(at: 1)),
-                            constraint: try? subTree.value(at: dependency.range(at: 2))
-                        )
-                    }
-            } else {
-                transitives = []
-            }
-            return Pod(name: name, version: Version(stringLiteral: version), dependencies: transitives)
+    static let checksum = "\(podName): ([a-f0-9]{40})"
+}
+
+// MARK: Pods
+private struct Pod {
+    let name: String
+    let version: Version
+    let dependencies: [TransitiveDependency]
+}
+private struct TransitiveDependency {
+    let name: String
+    let constraint: String?
+}
+
+private func parse(pods: String) throws -> [Pod] {
+    try pods.match(pattern: Pattern.podTree) { pod in
+        let name = try pods.value(at: pod.range(at: 1))
+        let version = try pods.value(at: pod.range(at: 2))
+        let transitives: [TransitiveDependency]
+        if let subTree = try? pods.value(at: pod.range(at: 6)) {
+            transitives = try subTree
+                .match(pattern: Pattern.podDependency) { dependency in
+                    TransitiveDependency(
+                        name: try subTree.value(at: dependency.range(at: 1)),
+                        constraint: try? subTree.value(at: dependency.range(at: 2))
+                    )
+                }
+        } else {
+            transitives = []
         }
+        return Pod(name: name, version: Version(stringLiteral: version), dependencies: transitives)
+    }
+}
+
+// MARK: Checkouts
+private struct Checkout {
+    let name: String
+    
+    enum Source {
+        case path(String)
+        case gitTag(String)
+        case gitCommit(String)
+    }
+    let source: Source
+}
+
+private func parse(externalSources: String, checkoutOptions: String) throws -> [Checkout] {
+    try externalSources.match(pattern: Pattern.externalSource) { source in
+        let name = try externalSources.value(at: source.range(at: 1))
+        let sourceType = try externalSources.value(at: source.range(at: 2))
+        
+        switch sourceType {
+        case "path":
+            return Checkout(name: name,
+                            source: .path(try externalSources.value(at: source.range(at: 3))))
+        case "git":
+            return try checkoutOptions.firstMatch(pattern: Pattern.checkoutOption(for: name)) { option in
+                let type = try checkoutOptions.value(at: option.range(at: 2))
+                let value = try checkoutOptions.value(at: option.range(at: 3))
+                let source: Checkout.Source
+                switch type {
+                case "commit":
+                    source = .gitCommit(value)
+                case "tag":
+                    source = .gitTag(value)
+                default:
+                    throw "unrecognized external source <\(type)>"
+                }
+                return Checkout(name: name, source: source)
+            }
+        default:
+            throw "unrecognized external source <\(sourceType)>"
+        }
+    }
+}
+
+// MARK: Checksums
+private func parse(checksums: String) throws -> [String: String] {
+    try checksums.match(pattern: Pattern.checksum) { line in
+        (name: try checksums.value(at: line.range(at: 1)),
+         hash: try checksums.value(at: line.range(at: 2)))
+    }
+    .reduce(into: [String: String]()) { result, item in
+        result[item.name] = item.hash
     }
 }
