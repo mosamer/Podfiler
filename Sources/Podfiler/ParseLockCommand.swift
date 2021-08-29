@@ -25,8 +25,15 @@ struct ParseLockCommand: ParsableCommand {
             throw "something went wrong. `Podfile.lock` does not lock as expected"
         }
         
+        let podfileChecksum = try parseFileCheckSum(sections[6])
+        Console.debug("CHECKSUM: \(podfileChecksum)")
+        
         let cocoapodVersion = try parseCocoapodsVersion(sections[7])
         Console.debug("Version: \(cocoapodVersion)")
+    }
+    
+    private func parseFileCheckSum(_ section: String) throws -> String {
+        try section.firstMatch(pattern: "PODFILE CHECKSUM: ([a-f0-9]{40})", rangeNumber: 1)
     }
     
     private func parseCocoapodsVersion(_ section: String) throws -> Version {
