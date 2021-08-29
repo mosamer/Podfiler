@@ -137,6 +137,10 @@ extension String {
         let end = index(start, offsetBy: range.length)
         return String(self[start..<end])
     }
+    
+    var regexEscaped: String {
+        replacingOccurrences(of: "/", with: "\\/")
+    }
 }
 
 struct Pod_ {

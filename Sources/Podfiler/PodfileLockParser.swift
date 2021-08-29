@@ -5,7 +5,7 @@ class PodfileLockParser {
     private let pods: [Pod]
     private let checkouts: [Checkout]
     private let checksums: [String: String]
-    
+    private let specRepos: [String: [String]]
     init(file: String) throws {
         let sections = file
             .replacingOccurrences(of: "\"", with: "")   // Clean " characters
@@ -18,6 +18,8 @@ class PodfileLockParser {
         self.pods = try parse(pods: sections[0])
         self.checkouts = try parse(externalSources: sections[3], checkoutOptions: sections[4])
         self.checksums = try parse(checksums: sections[5])
+        self.specRepos = try parse(specRepo: sections[2])
+        print(specRepos)
     }
 }
 
@@ -43,6 +45,10 @@ private enum Pattern {
     }
     
     static let checksum = "\(podName): ([a-f0-9]{40})"
+    // \s{2}([\w:\/.@]+):
+    static let specRepos = "\\s{2}([\\w:\\/.@]+):(\(podInSpec))+"
+    // \n\s{4}- ([+\w\/-]+)
+    static let podInSpec = "\\n\\s{4}- \(podName)"
 }
 
 // MARK: Pods
@@ -76,6 +82,21 @@ private func parse(pods: String) throws -> [Pod] {
     }
 }
 
+// MARK: Spec Repos
+private func parse(specRepo: String) throws -> [String: [String]] {
+    try specRepo
+        .match(pattern: Pattern.specRepos) { repo -> (url: String, pods: [String]) in
+            let url = try specRepo.value(at: repo.range(at: 1))
+            let repo = try specRepo.value(at: repo.range(at:0))
+            let pods = try repo.match(pattern: Pattern.podInSpec) { spec in
+                try repo.value(at: spec.range(at: 1))
+            }
+            return (url: url, pods: pods)
+        }
+        .reduce(into: [String: [String]]()) { result, repo in
+            result[repo.url] = repo.pods
+        }
+}
 // MARK: Checkouts
 private struct Checkout {
     let name: String
