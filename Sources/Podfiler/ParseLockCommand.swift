@@ -26,15 +26,54 @@ struct ParseLockCommand: ParsableCommand {
         }
         
         let specRepos = try parseSpecRepos(sections[2])
+            .flatMap { url, repos in
+                repos.map { (podName: $0, repo: url) }
+            }
         
-        let specs = try parseSpecChecksums(sections[5])
-        Console.debug("SPECS: \(specs.count)")
+        let checkouts = try parse(externalSources: sections[3],
+                                  checkoutOptions: sections[4])
+        
+        let sourced = checkouts.map { $0.name } + specRepos.map { $0.podName }
+        
+        let checksums = try parseSpecChecksums(sections[5])
+        
+    
+        Console.debug("SPECS: \(checksums.count)")
         
         let podfileChecksum = try parseFileCheckSum(sections[6])
         Console.debug("CHECKSUM: \(podfileChecksum)")
         
         let cocoapodVersion = try parseCocoapodsVersion(sections[7])
         Console.debug("Version: \(cocoapodVersion)")
+    }
+    
+    private func parse(externalSources: String, checkoutOptions: String) throws -> [Pod] {
+        try externalSources.match(pattern: "\\s{2}([\\w-]+):\\n\\s{4}:(path|git): \"?([\\w.:@\\/-]+)\"?") { match -> Pod in
+            let name = externalSources.value(at: match.range(at: 1))
+            let source = externalSources.value(at: match.range(at: 2))
+            switch source {
+            case "path":
+                let path = externalSources.value(at: match.range(at: 3))
+                return Pod(name: name, source: .path(path))
+            case "git":
+                return try checkoutOptions.firstMatch(pattern: "\\s{2}\(name):\\n(.*\\n)?\\s{4}:(commit|tag): ([\\w.-]+)") { co -> Pod in
+                    let option = checkoutOptions.value(at: co.range(at: 2))
+                    let value = checkoutOptions.value(at: co.range(at: 3))
+                    let source: Pod.Source
+                    switch option {
+                    case "commit":
+                        source = .gitCommit(value)
+                    case "tag":
+                        source = .gitTag(value)
+                    default:
+                        throw "unrecognized checkout option <\(option)>"
+                    }
+                    return Pod(name: name, source: source)
+                }
+            default:
+                throw "unrecognized external source <\(source)>"
+            }
+        }
     }
     
     private func parseSpecRepos(_ section: String) throws -> [String: [String]] {
@@ -92,14 +131,23 @@ extension String {
         return String(self[start..<end])
     }
     
-    func match<R>(pattern: String, handler: (NSTextCheckingResult) -> R) throws -> [R] {
+    func match<R>(pattern: String, handler: (NSTextCheckingResult) throws -> R) throws -> [R] {
         let regex = try NSRegularExpression(pattern: pattern, options: [])
         var results = [R]()
         regex.enumerateMatches(in: self, options: [], range: fullRange()) { result, _, _ in
-            guard let result = result else { return }
-            results.append(handler(result))
+            guard let result = result,
+            let item = try? handler(result) else { return }
+            results.append(item)
         }
         return results
+    }
+    
+    func firstMatch<R>(pattern: String, handler: (NSTextCheckingResult) throws -> R) throws -> R {
+        let regex = try NSRegularExpression(pattern: pattern, options: [])
+        guard let match = regex.firstMatch(in: self, options: [], range: fullRange()) else {
+            throw "regex pattern was not matched"
+        }
+        return try handler(match)
     }
     
     func firstMatch(pattern: String) throws -> [String] {
@@ -134,3 +182,13 @@ extension String {
     }
 }
 
+struct Pod {
+    let name: String
+    
+    enum Source {
+        case path(String)
+        case gitTag(String)
+        case gitCommit(String)
+    }
+    let source: Source
+}
