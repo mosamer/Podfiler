@@ -50,16 +50,16 @@ struct ParseLockCommand: ParsableCommand {
     
     private func parse(externalSources: String, checkoutOptions: String) throws -> [Pod] {
         try externalSources.match(pattern: "\\s{2}([\\w-]+):\\n\\s{4}:(path|git): \"?([\\w.:@\\/-]+)\"?") { match -> Pod in
-            let name = externalSources.value(at: match.range(at: 1))
-            let source = externalSources.value(at: match.range(at: 2))
+            let name = try externalSources.value(at: match.range(at: 1))
+            let source = try externalSources.value(at: match.range(at: 2))
             switch source {
             case "path":
-                let path = externalSources.value(at: match.range(at: 3))
+                let path = try externalSources.value(at: match.range(at: 3))
                 return Pod(name: name, source: .path(path))
             case "git":
                 return try checkoutOptions.firstMatch(pattern: "\\s{2}\(name):\\n(.*\\n)?\\s{4}:(commit|tag): ([\\w.-]+)") { co -> Pod in
-                    let option = checkoutOptions.value(at: co.range(at: 2))
-                    let value = checkoutOptions.value(at: co.range(at: 3))
+                    let option = try checkoutOptions.value(at: co.range(at: 2))
+                    let value = try checkoutOptions.value(at: co.range(at: 3))
                     let source: Pod.Source
                     switch option {
                     case "commit":
@@ -80,7 +80,7 @@ struct ParseLockCommand: ParsableCommand {
     private func parseSpecRepos(_ section: String) throws -> [String: [String]] {
         let urls = try section
             .match(pattern: "\\s{2}\"?([\\w.\\/@:]+)\"?:") { result in
-                section.value(at: result.range(at: 1))
+                try section.value(at: result.range(at: 1))
             }
         
         let repos = try urls
@@ -91,7 +91,7 @@ struct ParseLockCommand: ParsableCommand {
             }
             .map { repo in
                 try repo.match(pattern: "\\s{4}- ([\\w-]+)") {
-                    repo.value(at: $0.range(at: 1))
+                    try repo.value(at: $0.range(at: 1))
                 }
             }
         
@@ -111,8 +111,8 @@ struct ParseLockCommand: ParsableCommand {
     
     private func parseSpecChecksums(_ section: String) throws -> [[String: String]] {
         try section.match(pattern: "([\\w-]+): ([a-f0-9]{40})") { result in
-            let name = section.value(at: result.range(at: 1))
-            let hash = section.value(at: result.range(at: 2))
+            let name = try section.value(at: result.range(at: 1))
+            let hash = try section.value(at: result.range(at: 2))
             return [
                 "name": name,
                 "hash": hash,
@@ -126,7 +126,8 @@ extension String {
         NSRange(location: 0, length: count)
     }
     
-    func value(at range: NSRange) -> String {
+    func value(at range: NSRange) throws  -> String {
+        guard range.location != NSNotFound, range.length > 0 else { throw "not found" }
         let start = index(startIndex, offsetBy: range.location)
         let end = index(start, offsetBy: range.length)
         return String(self[start..<end])
@@ -192,4 +193,10 @@ struct Pod {
         case gitCommit(String)
     }
     let source: Source
+}
+
+extension NSRange {
+    var isFound: Bool {
+        location != NSNotFound && length > 0
+    }
 }
