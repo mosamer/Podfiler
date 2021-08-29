@@ -15,8 +15,31 @@ class PodfileLockParser {
         }
         
         self.pods = try parse(pods: sections[0])
-        self.checkouts = try parse(specRepo: sections[2], externalSources: sections[3], checkoutOptions: sections[4])
         self.checksums = try parse(checksums: sections[5])
+        self.checkouts = try parse(specRepo: sections[2], externalSources: sections[3], checkoutOptions: sections[4])
+    }
+    
+    func generatePodLock() throws -> [PodLock] {
+        try checksums.map { name, hash in
+            guard let checkout = checkouts.first(where: { $0.name == name }) else {
+                throw "can not find matching entry in checkout for <\(name)>"
+            }
+            guard let podTree = pods.first(where: {$0.name == name || $0.name.hasPrefix("\(name)/") }) else {
+                throw "can not find matching entry in pods tree for <\(name)>"
+            }
+
+            return PodLock(name: name,
+                           checksum: hash,
+                           version: podTree.version,
+                           source: checkout.source)
+        }
+    }
+    
+    struct PodLock {
+        let name: String
+        let checksum: String
+        let version: Version
+        let source: CheckoutSource
     }
 }
 // MARK: Patterns

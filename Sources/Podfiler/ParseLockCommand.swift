@@ -21,6 +21,7 @@ struct ParseLockCommand: ParsableCommand {
         
         let lock = try lockPath.read()
         let parser = try PodfileLockParser(file: lock)
-        
+        let result = try parser.generatePodLock()
+        print(result.count)
     }
 }
