@@ -19,7 +19,6 @@ class PodfileLockParser {
         self.checkouts = try parse(externalSources: sections[3], checkoutOptions: sections[4])
         self.checksums = try parse(checksums: sections[5])
         self.specRepos = try parse(specRepo: sections[2])
-        print(specRepos)
     }
 }
 
@@ -64,15 +63,15 @@ private struct TransitiveDependency {
 
 private func parse(pods: String) throws -> [Pod] {
     try pods.match(pattern: Pattern.podTree) { pod in
-        let name = try pods.value(at: pod.range(at: 1))
-        let version = try pods.value(at: pod.range(at: 2))
+        let name = try pods.value(from: pod, at: 1)
+        let version = try pods.value(from: pod, at: 2)
         let transitives: [TransitiveDependency]
-        if let subTree = try? pods.value(at: pod.range(at: 6)) {
+        if let subTree = try? pods.value(from: pod, at: 6) {
             transitives = try subTree
                 .match(pattern: Pattern.podDependency) { dependency in
                     TransitiveDependency(
-                        name: try subTree.value(at: dependency.range(at: 1)),
-                        constraint: try? subTree.value(at: dependency.range(at: 2))
+                        name: try subTree.value(from: dependency, at: 1),
+                        constraint: try? subTree.value(from: dependency, at: 2)
                     )
                 }
         } else {
@@ -86,10 +85,10 @@ private func parse(pods: String) throws -> [Pod] {
 private func parse(specRepo: String) throws -> [String: [String]] {
     try specRepo
         .match(pattern: Pattern.specRepos) { repo -> (url: String, pods: [String]) in
-            let url = try specRepo.value(at: repo.range(at: 1))
-            let repo = try specRepo.value(at: repo.range(at:0))
+            let url = try specRepo.value(from: repo, at: 1)
+            let repo = try specRepo.value(from: repo, at: 0)
             let pods = try repo.match(pattern: Pattern.podInSpec) { spec in
-                try repo.value(at: spec.range(at: 1))
+                try repo.value(from: spec, at: 1)
             }
             return (url: url, pods: pods)
         }
@@ -111,17 +110,17 @@ private struct Checkout {
 
 private func parse(externalSources: String, checkoutOptions: String) throws -> [Checkout] {
     try externalSources.match(pattern: Pattern.externalSource) { source in
-        let name = try externalSources.value(at: source.range(at: 1))
-        let sourceType = try externalSources.value(at: source.range(at: 2))
+        let name = try externalSources.value(from: source, at: 1)
+        let sourceType = try externalSources.value(from: source, at: 2)
         
         switch sourceType {
         case "path":
             return Checkout(name: name,
-                            source: .path(try externalSources.value(at: source.range(at: 3))))
+                            source: .path(try externalSources.value(from: source, at: 3)))
         case "git":
             return try checkoutOptions.firstMatch(pattern: Pattern.checkoutOption(for: name)) { option in
-                let type = try checkoutOptions.value(at: option.range(at: 2))
-                let value = try checkoutOptions.value(at: option.range(at: 3))
+                let type = try checkoutOptions.value(from: option, at: 2)
+                let value = try checkoutOptions.value(from: option, at: 3)
                 let source: Checkout.Source
                 switch type {
                 case "commit":
@@ -142,8 +141,8 @@ private func parse(externalSources: String, checkoutOptions: String) throws -> [
 // MARK: Checksums
 private func parse(checksums: String) throws -> [String: String] {
     try checksums.match(pattern: Pattern.checksum) { line in
-        (name: try checksums.value(at: line.range(at: 1)),
-         hash: try checksums.value(at: line.range(at: 2)))
+        (name: try checksums.value(from: line, at: 1),
+         hash: try checksums.value(from: line, at: 2))
     }
     .reduce(into: [String: String]()) { result, item in
         result[item.name] = item.hash
