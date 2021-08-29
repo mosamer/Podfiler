@@ -25,6 +25,9 @@ struct ParseLockCommand: ParsableCommand {
             throw "something went wrong. `Podfile.lock` does not lock as expected"
         }
         
+        let specs = try parseSpecChecksums(sections[5])
+        Console.debug("SPECS: \(specs.count)")
+        
         let podfileChecksum = try parseFileCheckSum(sections[6])
         Console.debug("CHECKSUM: \(podfileChecksum)")
         
@@ -40,11 +43,38 @@ struct ParseLockCommand: ParsableCommand {
         let version = try section.firstMatch(pattern: "COCOAPODS: (\\d+.\\d+.\\d+)", rangeNumber: 1)
         return Version(stringLiteral: String(version))
     }
+    
+    private func parseSpecChecksums(_ section: String) throws -> [[String: String]] {
+        try section.match(pattern: "([\\w-]+): ([a-f0-9]{40})") { result in
+            let name = section.value(at: result.range(at: 1))
+            let hash = section.value(at: result.range(at: 2))
+            return [
+                "name": name,
+                "hash": hash,
+            ]
+        }
+    }
 }
 
 extension String {
     private func fullRange() -> NSRange {
         NSRange(location: 0, length: count)
+    }
+    
+    func value(at range: NSRange) -> String {
+        let start = index(startIndex, offsetBy: range.location)
+        let end = index(start, offsetBy: range.length)
+        return String(self[start..<end])
+    }
+    
+    func match<R>(pattern: String, handler: (NSTextCheckingResult) -> R) throws -> [R] {
+        let regex = try NSRegularExpression(pattern: pattern, options: [])
+        var results = [R]()
+        regex.enumerateMatches(in: self, options: [], range: fullRange()) { result, _, _ in
+            guard let result = result else { return }
+            results.append(handler(result))
+        }
+        return results
     }
     
     func firstMatch(pattern: String) throws -> [String] {
@@ -78,3 +108,4 @@ extension String {
         return String(self[start..<end])
     }
 }
+
