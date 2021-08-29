@@ -20,6 +20,7 @@ struct ParseLockCommand: ParsableCommand {
         Console.debug("reading lock file from: \(lockPath.pathString)")
         
         let lock = try lockPath.read()
+        let parser = try PodfileLockParser(file: lock)
         let sections = lock.components(separatedBy: "\n\n")
         guard sections.count == 8 else {
             throw "something went wrong. `Podfile.lock` does not lock as expected"
