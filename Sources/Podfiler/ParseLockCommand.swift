@@ -25,6 +25,8 @@ struct ParseLockCommand: ParsableCommand {
             throw "something went wrong. `Podfile.lock` does not lock as expected"
         }
         
+        let specRepos = try parseSpecRepos(sections[2])
+        
         let specs = try parseSpecChecksums(sections[5])
         Console.debug("SPECS: \(specs.count)")
         
@@ -35,6 +37,29 @@ struct ParseLockCommand: ParsableCommand {
         Console.debug("Version: \(cocoapodVersion)")
     }
     
+    private func parseSpecRepos(_ section: String) throws -> [String: [String]] {
+        let urls = try section
+            .match(pattern: "\\s{2}\"?([\\w.\\/@:]+)\"?:") { result in
+                section.value(at: result.range(at: 1))
+            }
+        
+        let repos = try urls
+            .map { $0.replacingOccurrences(of: "/", with: "\\/")}
+            .map { url -> String in
+                let pattern = "\\s{2}\"?\(url)\"?:(\\n\\s{4}- ([\\w-]+))+"
+                return try section.firstMatch(pattern: pattern, rangeNumber: 0)
+            }
+            .map { repo in
+                try repo.match(pattern: "\\s{4}- ([\\w-]+)") {
+                    repo.value(at: $0.range(at: 1))
+                }
+            }
+        
+        return zip(urls, repos).reduce(into: [String: [String]]()) { result, item in
+            let (url, pods) = item
+            result[url] = pods
+        }
+    }
     private func parseFileCheckSum(_ section: String) throws -> String {
         try section.firstMatch(pattern: "PODFILE CHECKSUM: ([a-f0-9]{40})", rangeNumber: 1)
     }
