@@ -16,6 +16,12 @@ struct ParseLockCommand: ParsableCommand {
     var lockPath: AbsolutePath
     
     func run() throws {
+        Console.debug("reading lock file from: \(lockPath.pathString)")
         
+        let lock = try lockPath.read()
+        let sections = lock.components(separatedBy: "\n\n")
+        guard sections.count == 8 else {
+            throw "something went wrong. `Podfile.lock` does not lock as expected"
+        }
     }
 }

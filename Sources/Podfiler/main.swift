@@ -5,6 +5,7 @@ struct Podfiler: ParsableCommand {
         commandName: "podfiler",
         abstract: "Utilities to process and work with Cocoapods files",
         subcommands: [
+            ParseLockCommand.self,
         ]
     )
 
@@ -18,7 +19,7 @@ struct Podfiler: ParsableCommand {
                 Podfiler.exit(withError: error)
             } else {
                 let errorMessage = Podfiler.fullMessage(for: error)
-                print(errorMessage)
+                Console.error(errorMessage)
             }
         }
     }
