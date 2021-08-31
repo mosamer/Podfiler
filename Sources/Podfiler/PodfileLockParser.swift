@@ -34,13 +34,6 @@ class PodfileLockParser {
                            source: checkout.source)
         }
     }
-    
-    struct PodLock {
-        let name: String
-        let checksum: String
-        let version: Version
-        let source: CheckoutSource
-    }
 }
 // MARK: Patterns
 private enum Pattern {
