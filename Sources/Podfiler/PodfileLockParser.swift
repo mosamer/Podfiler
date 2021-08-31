@@ -56,7 +56,7 @@ private enum Pattern {
     static let podDependency = "\\n\\s{4}- \(podName)( \\((\(constraint))\\))?"
     
     // \s{2}([+\w\/-]+):\n\s{4}:(path|git): ([-.\w:\/@]+)
-    static let externalSource = "\\s{2}\(podName):\\n\\s{4}:(path|git): ([-.\\w:\\/@]+)"
+    static let externalSource = "\\s{2}\(podName):\\n\\s{4}:(path|git|http): ([-.\\w:\\/@]+)"
     
     // \s{2}<name>:\n(.*\n)?\s{4}:(commit|tag): ([\w.-]+)
     static func checkoutOption(for name: String) -> String {
@@ -123,6 +123,7 @@ enum CheckoutSource {
     case gitTag(String)
     case gitCommit(String)
     case specRepo(String)
+    case http(String)
 }
 
 private struct Checkout {
@@ -139,6 +140,9 @@ private func parse(specRepo: String, externalSources: String, checkoutOptions: S
         case "path":
             return Checkout(name: name,
                             source: .path(try externalSources.value(from: source, at: 3)))
+        case "http":
+            return Checkout(name: name,
+                            source: .http(try externalSources.value(from: source, at: 3)))
         case "git":
             return try checkoutOptions.firstMatch(pattern: Pattern.checkoutOption(for: name)) { option in
                 let type = try checkoutOptions.value(from: option, at: 2)
@@ -150,7 +154,7 @@ private func parse(specRepo: String, externalSources: String, checkoutOptions: S
                 case "tag":
                     source = .gitTag(value)
                 default:
-                    throw "unrecognized external source <\(type)>"
+                    throw "unrecognized Git external source <\(type)>"
                 }
                 return Checkout(name: name, source: source)
             }
