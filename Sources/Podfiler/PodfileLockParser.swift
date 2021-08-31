@@ -117,15 +117,8 @@ private func parse(specRepo: String) throws -> [Checkout] {
         }
         .flatMap { $0 }
 }
-// MARK: Checkouts
-enum CheckoutSource {
-    case path(String)
-    case gitTag(String)
-    case gitCommit(String)
-    case specRepo(String)
-    case http(String)
-}
 
+// MARK: Checkouts
 private struct Checkout {
     let name: String
     let source: CheckoutSource
@@ -135,14 +128,14 @@ private func parse(specRepo: String, externalSources: String, checkoutOptions: S
     let checkouts: [Checkout] = try externalSources.match(pattern: Pattern.externalSource) { source in
         let name = try externalSources.value(from: source, at: 1)
         let sourceType = try externalSources.value(from: source, at: 3)
-        
+        let sourceURL = try externalSources.value(from: source, at: 4)
         switch sourceType {
         case "path":
             return Checkout(name: name,
-                            source: .path(try externalSources.value(from: source, at: 3)))
+                            source: .path(sourceURL))
         case "http":
             return Checkout(name: name,
-                            source: .http(try externalSources.value(from: source, at: 3)))
+                            source: .http(sourceURL))
         case "git":
             return try checkoutOptions.firstMatch(pattern: Pattern.checkoutOption(for: name)) { option in
                 let type = try checkoutOptions.value(from: option, at: 2)
@@ -150,9 +143,9 @@ private func parse(specRepo: String, externalSources: String, checkoutOptions: S
                 let source: CheckoutSource
                 switch type {
                 case "commit":
-                    source = .gitCommit(value)
+                    source = .gitCommit(value, url: sourceURL)
                 case "tag":
-                    source = .gitTag(value)
+                    source = .gitTag(value, url: sourceURL)
                 default:
                     throw "unrecognized Git external source <\(type)>"
                 }
