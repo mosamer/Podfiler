@@ -2,6 +2,7 @@ import Foundation
 import ArgumentParser
 import TSCBasic
 import TSCUtility
+import Yams
 
 struct ParseLockCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
@@ -16,12 +17,20 @@ struct ParseLockCommand: ParsableCommand {
     )
     var lockPath: AbsolutePath
     
+    @Option(
+        help: "Path to write generated lock to"
+    )
+    var output: AbsolutePath
+    
     func run() throws {
         Console.debug("reading lock file from: \(lockPath.pathString)")
         
         let lock = try lockPath.read()
         let parser = try PodfileLockParser(file: lock)
         let result = try parser.generatePodLock()
-        print(result.count)
+        
+        let encoder = YAMLEncoder()
+        let yml = try encoder.encode(result)
+        try output.write(yml)
     }
 }

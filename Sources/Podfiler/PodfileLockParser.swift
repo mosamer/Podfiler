@@ -33,6 +33,7 @@ class PodfileLockParser {
                            version: podTree.version,
                            source: checkout.source)
         }
+        .sorted { $0.name < $1.name }
     }
 }
 // MARK: Patterns
