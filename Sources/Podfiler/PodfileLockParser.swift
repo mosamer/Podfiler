@@ -55,8 +55,8 @@ private enum Pattern {
     // \n\s{4}- ([+\w\/-]+)( \(([=\s\d.>,~<]+)\))?
     static let podDependency = "\\n\\s{4}- \(podName)( \\((\(constraint))\\))?"
     
-    // \s{2}([+\w\/-]+):\n\s{4}:(path|git): ([-.\w:\/@]+)
-    static let externalSource = "\\s{2}\(podName):\\n\\s{4}:(path|git|http): ([-.\\w:\\/@]+)"
+    // \s{2}([+\w\/-]+):\n(.*\n)?\s{4}:(path|git): ([-.\w:\/@]+)
+    static let externalSource = "\\s{2}\(podName):\\n(.*\\n)?\\s{4}:(path|git|http): ([-.\\w:\\/@]+)"
     
     // \s{2}<name>:\n(.*\n)?\s{4}:(commit|tag): ([\w.-]+)
     static func checkoutOption(for name: String) -> String {
@@ -134,7 +134,7 @@ private struct Checkout {
 private func parse(specRepo: String, externalSources: String, checkoutOptions: String) throws -> [Checkout] {
     let checkouts: [Checkout] = try externalSources.match(pattern: Pattern.externalSource) { source in
         let name = try externalSources.value(from: source, at: 1)
-        let sourceType = try externalSources.value(from: source, at: 2)
+        let sourceType = try externalSources.value(from: source, at: 3)
         
         switch sourceType {
         case "path":
