@@ -1,11 +1,11 @@
 import Foundation
 import TSCUtility
 
-class PodfileLockParser {
+public class PodfileLockParser {
     private let pods: [Pod]
     private let checkouts: [Checkout]
     private let checksums: [String: String]
-    init(file: String) throws {
+    public init(file: String) throws {
         let sections = file
             .replacingOccurrences(of: "\"", with: "")   // Clean " characters
             .components(separatedBy: "\n\n")            // Separate sections
@@ -19,7 +19,7 @@ class PodfileLockParser {
         self.checkouts = try parse(specRepo: sections[2], externalSources: sections[3], checkoutOptions: sections[4])
     }
     
-    func generatePodLock() throws -> [PodLock] {
+    public func generatePodLock() throws -> [PodLock] {
         try checksums.map { name, hash in
             guard let checkout = checkouts.first(where: { $0.name == name }) else {
                 throw "can not find matching entry in checkout for <\(name)>"

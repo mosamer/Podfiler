@@ -3,6 +3,7 @@ import ArgumentParser
 import TSCBasic
 import TSCUtility
 import Yams
+import PodfilerKit
 
 struct ParseLockCommand: ParsableCommand {
     static let configuration = CommandConfiguration(

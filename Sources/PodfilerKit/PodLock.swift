@@ -1,7 +1,7 @@
 import Foundation
 import TSCUtility
 
-struct PodLock {
+public struct PodLock {
     let name: String
     let checksum: String
     let version: Version
@@ -9,7 +9,7 @@ struct PodLock {
 }
 
 extension PodLock: Encodable {
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var container = try encoder.arbitraryContainer()
         
         var nested = container.nestedContainer(keyedBy: ArbitraryCodingKeys.self, forKey: "\(name)")

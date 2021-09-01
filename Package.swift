@@ -7,6 +7,7 @@ let package = Package(
     name: "Podfiler",
     products: [
         .executable(name: "podfiler", targets: ["Podfiler"]),
+        .library(name: "PodfilerKit", targets: ["PodfilerKit"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser", .upToNextMajor(from: "0.3.0")),
@@ -19,7 +20,14 @@ let package = Package(
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "SwiftToolsSupport-auto", package: "swift-tools-support-core"),
+                "PodfilerKit",
                 "Yams",
+            ]
+        ),
+        .target(
+            name: "PodfilerKit",
+            dependencies: [
+                
             ]
         ),
     ]
