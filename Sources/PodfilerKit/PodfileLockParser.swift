@@ -1,10 +1,13 @@
 import Foundation
 import TSCUtility
 
+/// A class capable of parsing `Podfile.lock` files
 public class PodfileLockParser {
     private let pods: [Pod]
     private let checkouts: [Checkout]
     private let checksums: [String: String]
+    /// Initializes a parser given file content
+    /// - Parameter file: Content of `Podfile.lock` file
     public init(file: String) throws {
         let sections = file
             .replacingOccurrences(of: "\"", with: "")   // Clean " characters
@@ -19,6 +22,8 @@ public class PodfileLockParser {
         self.checkouts = try parse(specRepo: sections[2], externalSources: sections[3], checkoutOptions: sections[4])
     }
     
+    /// Generates parsed list of pod locks
+    /// - Returns: A list of `PodLock` objects parsed from file configured during initialization
     public func generatePodLock() throws -> [PodLock] {
         try checksums.map { name, hash in
             guard let checkout = checkouts.first(where: { $0.name == name }) else {
