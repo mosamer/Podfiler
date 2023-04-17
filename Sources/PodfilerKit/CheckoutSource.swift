@@ -6,4 +6,5 @@ enum CheckoutSource {
     case gitCommit(String, url: String)
     case specRepo(String)
     case http(String)
+    case podspec(String)
 }
