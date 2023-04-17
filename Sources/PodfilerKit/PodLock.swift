@@ -30,6 +30,8 @@ extension PodLock: Encodable {
             try nested.encode(commit, forKey: "commit")
         case let .specRepo(repo):
             try nested.encode(repo, forKey: "spec")
+        case let .podspec(repo):
+            try nested.encode(repo, forKey: "podspec")
         }
     }
 }
