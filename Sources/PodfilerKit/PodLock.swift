@@ -2,7 +2,7 @@ import Foundation
 import TSCUtility
 
 /// A struct representing lock information for a Pod
-public struct PodLock {
+public struct PodLock: Equatable {
     let name: String
     let checksum: String
     let version: Version

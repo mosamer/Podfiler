@@ -45,10 +45,8 @@ public class PodfileLockParser {
 private enum Pattern {
     // ([+\w\/-]+)
     private static let podName = "([+\\w\\/-]+)"
-    // (\d+(.\d+(.\d+(-[\w\d.]+)?)?)?)
-    private static let semVer = "(\\d+(.\\d+(.\\d+(-[\\w\\d.]+)?)?)?)"
-    // \s{2}- ([+\w\/-]+) \((\d+(.\d+(.\d+(-[\w\d.]+)?)?)?)\)(:(\n\s{4}- ([+\w\/-]+)( \(([=\s\d.>,~<]+)\))?)+)?
-    static let podTree = "\\s{2}- \(podName) \\(\(semVer)\\)(:(\(podDependency))+)?"
+    // \s{2}- ([+\w\/-]+) \(([^\)]+)\)(:(\n\s{4}- ([+\w\/-]+)( \(([=\s\d.>,~<]+)\))?)+)?
+    static let podTree = "^\\s{2}- \(podName) \\(([^\\)]+)\\)(:(\(podDependency))+)?"
     // [=\s\d.>,~<]+
     private static let constraint = "[=\\s\\d.>,~<]+"
     // \n\s{4}- ([+\w\/-]+)( \(([=\s\d.>,~<]+)\))?
@@ -81,9 +79,9 @@ private struct TransitiveDependency {
 }
 
 private func parse(pods: String) throws -> [Pod] {
-    try pods.match(pattern: Pattern.podTree) { pod in
+    try pods.match(pattern: Pattern.podTree, anchorsMatchLines: true) { pod in
         let name = try pods.value(from: pod, at: 1)
-        let version = try pods.value(from: pod, at: 2)
+        let versionString = try pods.value(from: pod, at: 2)
         let transitives: [TransitiveDependency]
         if let subTree = try? pods.value(from: pod, at: 6) {
             transitives = try subTree
@@ -96,7 +94,10 @@ private func parse(pods: String) throws -> [Pod] {
         } else {
             transitives = []
         }
-        return Pod(name: name, version: Version(stringLiteral: version), dependencies: transitives)
+        guard let version = Version(string: versionString) else {
+            throw "Couldn't parse the version string '\(versionString)' of the pod '\(name)'"
+        }
+        return Pod(name: name, version: version, dependencies: transitives)
     }
 }
 

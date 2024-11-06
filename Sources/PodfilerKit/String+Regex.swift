@@ -9,8 +9,12 @@ extension String {
         return String(self[start..<end])
     }
     
-    func match<R>(pattern: String, handler: (NSTextCheckingResult) throws -> R) throws -> [R] {
-        let regex = try NSRegularExpression(pattern: pattern, options: [])
+    func match<R>(pattern: String, anchorsMatchLines: Bool = false, handler: (NSTextCheckingResult) throws -> R) throws -> [R] {
+        var options: NSRegularExpression.Options = []
+        if anchorsMatchLines {
+            options.insert(.anchorsMatchLines)
+        }
+        let regex = try NSRegularExpression(pattern: pattern, options: options)
         var results = [NSTextCheckingResult]()
         regex.enumerateMatches(in: self, options: [], range: NSRange(location: 0, length: count)) { result, _, _ in
             guard let match = result else { return }

@@ -14,6 +14,8 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser", .upToNextMajor(from: "1.0.3")),
         .package(url: "https://github.com/apple/swift-tools-support-core", from: "0.1.10"),
         .package(url: "https://github.com/jpsim/Yams.git", .upToNextMajor(from: "5.0.1")),
+        .package(url: "https://github.com/Quick/Nimble.git", from: "13.0.0"),
+        .package(url: "https://github.com/Quick/Quick.git", from: "7.3.0"),
     ],
     targets: [
         .executableTarget(
@@ -31,5 +33,13 @@ let package = Package(
                 .product(name: "SwiftToolsSupport-auto", package: "swift-tools-support-core"),
             ]
         ),
+        .testTarget(
+            name: "PodfileKitTests",
+            dependencies: [
+                "PodfilerKit",
+                "Nimble",
+                "Quick",
+            ]
+        )
     ]
 )
